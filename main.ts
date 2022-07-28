@@ -2,7 +2,8 @@ import { App, CachedMetadata, Editor, getAllTags, MarkdownView, MetadataCache, M
 
 // Remember to rename these classes and interfaces!
 
-const regex1 = new RegExp(/(?<=[\s>]|^)#(\w*[A-Za-z_/-]+\w*)/ig);
+const dateRegex = new RegExp(/date: \d{4}\-(0?[1-9]|1[012])\-(0?[1-9]|[12][0-9]|3[01])*/ig);
+const tagRegex = new RegExp(/(?<=[\s>]|^)#(\w*[A-Za-z_/-]+\w*)/ig);
 
 interface MyPluginSettings {
 	mySetting: string;
@@ -101,8 +102,12 @@ class CachedStruct {
 
 		let headerTags: Array<string> = []
 
+		const date = data.match(dateRegex)?.first()?.substring(6)
+		
+
 		// if has header tag
 		if (cache?.frontmatter != null) {
+	
 			parseFrontMatterTags(cache.frontmatter)?.forEach(t => headerTags.push(t))
 			if (pathTag != null) {
 				headerTags.push(pathTag)
@@ -113,6 +118,8 @@ class CachedStruct {
 		// no tags and no header tags
 		if (cache?.tags == null && headerTags.length == 0) {
 			selections.push({
+				hasHeader: false,
+				date: date,
 				kind:  SELECTION_KIND.ORPHAN,
 				cursor: 0,
 				path: file.path,
@@ -127,6 +134,8 @@ class CachedStruct {
 		// push header tag
 		if (headerTags.length > 0) {
 			selections.push({
+				hasHeader: true,
+				date: date,
 				kind:  SELECTION_KIND.CONTENT,
 				cursor: 0,
 				path: file.path,
@@ -143,12 +152,14 @@ class CachedStruct {
 		let offset = 0;
 		for (let i = 0 ; i < dataSpl.length ; i++){
 			const paragraph = dataSpl[i]
-			const tagIdx = paragraph.search(regex1)
+			const tagIdx = paragraph.search(tagRegex)
 	
 			if (tagIdx != -1) {
-				const tags = [...paragraph.matchAll(regex1)].map(k => k[0]).join().replace("/",",").split(",");
+				const tags = [...paragraph.matchAll(tagRegex)].map(k => k[0]).join().replace("/",",").split(",");
 				tags.push(...headerTags)
 				selections.push({
+					hasHeader: headerTags.length > 0,
+					date: date,
 					kind:  SELECTION_KIND.CONTENT,
 					cursor: i,
 					path: file.path,
@@ -167,11 +178,13 @@ class CachedStruct {
 	toSelections() : Selection[] {
 		let selections: Array<Selection> = []
 		this.fileMap.forEach(k => selections.push(...k))
-		return selections
+		return selections.sort(compare)
 	}
 }
 
 interface Selection {
+	hasHeader: boolean;
+	date: string|undefined;
 	kind: string;
 	cursor: number;
 	file: TFile;
@@ -180,6 +193,16 @@ interface Selection {
 	tags: string[];
 }
 
+function compare( a: Selection, b: Selection ) {
+	if (a.date == undefined) {
+		return 1
+	}
+	if (b.date == undefined) {
+		return -1
+	}
+	return a.date > b.date ? -1 : 1;
+  }
+
 class SelectorModal extends SuggestModal<Selection> {
 
 	allResults: Selection[];
@@ -187,9 +210,12 @@ class SelectorModal extends SuggestModal<Selection> {
 
 	getSuggestions(query: string): Selection[] | Promise<Selection[]> {
 		const getOrphan = query.startsWith("!")
+		const getNoMd = query.startsWith("!!")
 		let currentPath = ''
 		return this.allResults.filter((page) => {
-			if (getOrphan) {
+			if (!page.hasHeader && getNoMd){
+				return true
+			} else if (getOrphan) {
 				return page.kind == SELECTION_KIND.ORPHAN;
 			} else {
 				if (page.kind == SELECTION_KIND.ORPHAN) {
@@ -222,12 +248,12 @@ class SelectorModal extends SuggestModal<Selection> {
 				tagContainer.createEl("a", { text: value.tags[i], cls: "tag selection__tag" });
 			}
 		}else if (value.kind == SELECTION_KIND.ORPHAN) {
-			console.log(value)
 			const selection = el.createEl("div", { cls: "selection" });
 			selection.createEl("div", { text: value.path, cls: "selection__title_bad" });
 		}else if (value.kind == SELECTION_KIND.METATAG) {
 			const selection = el.createEl("div", { cls: "selection" });
-			selection.createEl("div", { text: value.path, cls: "selection__title" });
+			const title = selection.createEl("div", { text: value.path, cls: "selection__title" });
+			title.createEl("small", { text: !value.hasHeader ? ' → (miss metadata)': '', cls: "selection__title_bad" });
 			selection.createEl("small", { text: value.description, cls: "selection__description" });
 	
 			const tagContainer = selection.createEl("p")
