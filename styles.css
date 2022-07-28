@@ -15,4 +15,5 @@
     margin-top: 0px !important;
     /* background-color: #4a3960 !important; */
     background-color: var(--background-secondary) !important;
+    color: var(--text-accent) !important;
 }
