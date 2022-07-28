@@ -2,7 +2,7 @@ import { App, CachedMetadata, Editor, getAllTags, MarkdownView, MetadataCache, M
 
 // Remember to rename these classes and interfaces!
 
-const regex1 = new RegExp(/(?<=[\s>]|^)#(\w*[A-Za-z_/]+\w*)/ig);
+const regex1 = new RegExp(/(?<=[\s>]|^)#(\w*[A-Za-z_/-]+\w*)/ig);
 
 interface MyPluginSettings {
 	mySetting: string;
@@ -72,34 +72,53 @@ export default class MyPlugin extends Plugin {
 }
 
 class CachedStruct {
-	fileMap: Map<string, Selection>
+	fileMap: Map<string, Selection[]>
 	constructor() {
-		this.fileMap = new Map<string, Selection>
+		this.fileMap = new Map<string, Selection[]>
 	}
 
 	setFileMap(file: TFile, cache: CachedMetadata | null, data: string) {
+		let selections: Array<Selection> = []
+
+		let pathTag: string|null = null
+		const pathSpl = file.path.split("/") 
+		if (pathSpl.length > 1) {
+			pathTag = "#" + pathSpl[pathSpl.length-2]
+		}
+
 		let headerTags: Array<string> = []
+
+		// if has header tag
 		if (cache?.frontmatter != null) {
 			parseFrontMatterTags(cache.frontmatter)?.forEach(t => headerTags.push(t))
-			this.fileMap.set(file.name, {
+			if (pathTag != null) {
+				headerTags.push(pathTag)
+			}
+			selections.push({
 				cursor: 0,
 				title: file.path,
 				description: data.replace(/[\r\n]/gm, '  ').substring(0,200),
-				tags: headerTags.sort(),
+				tags: headerTags.sort().filter(function(elem, index, self) {
+					return index === self.indexOf(elem);
+				}),
 				file: file
 			})
 		}
 
+
+		// no tags and no header tags
 		if (cache?.tags == null && headerTags.length == 0) {
-			this.fileMap.set(file.name, {
+			selections.push({
 				cursor: 0,
 				title: file.path,
 				description: "",
 				tags: [],
 				file: file
 			})
+			this.fileMap.set(file.path, selections)
 			return 
 		}
+		
 
 		const dataSpl = data.split("\n")
 		let offset = 0;
@@ -110,21 +129,24 @@ class CachedStruct {
 			if (tagIdx != -1) {
 				const tags = [...paragraph.matchAll(regex1)].map(k => k[0]);
 				tags.push(...headerTags)
-				this.fileMap.set(file.name, {
+				selections.push({
 					cursor: i,
 					title: file.path,
 					description: data.replace(/[\r\n]/gm, '  ').substring(offset+tagIdx-100, offset+tagIdx+100),
-					tags: tags.sort(),
+					tags: tags.sort().filter(function(elem, index, self) {
+						return index === self.indexOf(elem);
+					}),
 					file: file
 				})
 			}
 			offset += paragraph.length
 		}
+		this.fileMap.set(file.path, selections)
 	}
 
 	toSelections() : Selection[] {
 		let selections: Array<Selection> = []
-		this.fileMap.forEach(k => selections.push(k))
+		this.fileMap.forEach(k => selections.push(...k))
 		return selections
 	}
 }
@@ -140,6 +162,7 @@ interface Selection {
 class SelectorModal extends SuggestModal<Selection> {
 
 	allResults: Selection[];
+
 
 	getSuggestions(query: string): Selection[] | Promise<Selection[]> {
 		const getOrphan = query.startsWith("!")
@@ -193,6 +216,13 @@ class SelectorModal extends SuggestModal<Selection> {
 	constructor(app: App, res: Selection[]) {
 		super(app);
 		this.allResults = res;
+		this.setInstructions([
+			{command: "↑↓", purpose: "to navidate"},
+			{command: "↵", purpose: "to open"},
+			{command: "esc", purpose: "to dismiss"}
+		])
+		this.setPlaceholder("Type one tag or multiple (eg.: tag1 tag2)")
+		this.limit = 20
 	}
 
 	onClose() {
