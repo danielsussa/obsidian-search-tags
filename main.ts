@@ -74,6 +74,12 @@ export default class MyPlugin extends Plugin {
 	}
 }
 
+const SELECTION_KIND = {
+	ORPHAN: 'orphan',
+	METATAG: 'metatag',
+	CONTENT: 'content',
+} as const
+
 class CachedStruct {
 	fileMap: Map<string, Selection[]>
 	constructor() {
@@ -101,29 +107,35 @@ class CachedStruct {
 			if (pathTag != null) {
 				headerTags.push(pathTag)
 			}
-			selections.push({
-				cursor: 0,
-				title: file.path,
-				description: data.replace(/[\r\n]/gm, '  ').substring(0,200),
-				tags: headerTags.sort().filter(function(elem, index, self) {
-					return index === self.indexOf(elem);
-				}),
-				file: file
-			})
 		}
 
 
 		// no tags and no header tags
 		if (cache?.tags == null && headerTags.length == 0) {
 			selections.push({
+				kind:  SELECTION_KIND.ORPHAN,
 				cursor: 0,
-				title: file.path,
+				path: file.path,
 				description: "",
 				tags: [],
 				file: file
 			})
 			this.fileMap.set(file.path, selections)
 			return 
+		}
+
+		// push header tag
+		if (headerTags.length > 0) {
+			selections.push({
+				kind:  SELECTION_KIND.CONTENT,
+				cursor: 0,
+				path: file.path,
+				description: data.replace(/[\r\n]/gm, '  ').substring(0,200),
+				tags: headerTags.sort().filter(function(elem, index, self) {
+					return index === self.indexOf(elem);
+				}),
+				file: file
+			})
 		}
 		
 
@@ -134,11 +146,12 @@ class CachedStruct {
 			const tagIdx = paragraph.search(regex1)
 	
 			if (tagIdx != -1) {
-				const tags = [...paragraph.matchAll(regex1)].map(k => k[0]);
+				const tags = [...paragraph.matchAll(regex1)].map(k => k[0]).join().replace("/",",").split(",");
 				tags.push(...headerTags)
 				selections.push({
+					kind:  SELECTION_KIND.CONTENT,
 					cursor: i,
-					title: file.path,
+					path: file.path,
 					description: data.replace(/[\r\n]/gm, '  ').substring(offset+tagIdx-100, offset+tagIdx+100),
 					tags: tags.sort().filter(function(elem, index, self) {
 						return index === self.indexOf(elem);
@@ -159,9 +172,10 @@ class CachedStruct {
 }
 
 interface Selection {
+	kind: string;
 	cursor: number;
 	file: TFile;
-	title: string;
+	path: string;
 	description: string;
 	tags: string[];
 }
@@ -173,11 +187,12 @@ class SelectorModal extends SuggestModal<Selection> {
 
 	getSuggestions(query: string): Selection[] | Promise<Selection[]> {
 		const getOrphan = query.startsWith("!")
+		let currentPath = ''
 		return this.allResults.filter((page) => {
 			if (getOrphan) {
-				return page.tags.length == 0;
+				return page.kind == SELECTION_KIND.ORPHAN;
 			} else {
-				if (page.tags.length == 0) {
+				if (page.kind == SELECTION_KIND.ORPHAN) {
 					return false
 				}
 				for (const subQuery of query.split(" ")) {
@@ -187,6 +202,10 @@ class SelectorModal extends SuggestModal<Selection> {
 						return false
 					}
 				}
+				if (page.path != currentPath) {
+					page.kind = SELECTION_KIND.METATAG
+				}
+				currentPath = page.path
 				return true
 			}
 
@@ -194,19 +213,29 @@ class SelectorModal extends SuggestModal<Selection> {
 	}
 
 	renderSuggestion(value: Selection, el: HTMLElement) {
-		if (value.tags.length > 0) {
-			const selection = el.createEl("div", { cls: "selection" });
-			selection.createEl("div", { text: value.title, cls: "selection__title" });
+		if (value.kind == SELECTION_KIND.CONTENT) {
+			const selection = el.createEl("div", { cls: "selection-content" });
 			selection.createEl("small", { text: value.description, cls: "selection__description" });
 	
 			const tagContainer = selection.createEl("p")
 			for (let i = 0; i < value.tags.length; i++) {
 				tagContainer.createEl("a", { text: value.tags[i], cls: "tag selection__tag" });
 			}
-		}else {
+		}else if (value.kind == SELECTION_KIND.ORPHAN) {
+			console.log(value)
 			const selection = el.createEl("div", { cls: "selection" });
-			selection.createEl("div", { text: value.title, cls: "selection__title_bad" });
+			selection.createEl("div", { text: value.path, cls: "selection__title_bad" });
+		}else if (value.kind == SELECTION_KIND.METATAG) {
+			const selection = el.createEl("div", { cls: "selection" });
+			selection.createEl("div", { text: value.path, cls: "selection__title" });
+			selection.createEl("small", { text: value.description, cls: "selection__description" });
+	
+			const tagContainer = selection.createEl("p")
+			for (let i = 0; i < value.tags.length; i++) {
+				tagContainer.createEl("a", { text: value.tags[i], cls: "tag selection__tag" });
+			}
 		}
+
 	}
 
 	onChooseSuggestion(item: Selection, evt: MouseEvent | KeyboardEvent) {

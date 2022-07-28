@@ -1,7 +1,12 @@
 .selection {
     /* border: 1px solid var(--background-modifier-border); */
     padding: 10px;
-  }
+}
+
+.selection-content {
+    border-left: 3px solid var(--background-modifier-border);
+    padding: 10px;
+}
   
 .selection__title {
     font-weight: 600;
