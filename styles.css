@@ -7,6 +7,11 @@
     font-weight: 600;
 }
 
+.selection__title_bad {
+    font-weight: 600;
+    color: var(--red) !important;
+}
+
 .selection__description {
     color: var(--text-muted);
 }

@@ -43,6 +43,9 @@ export default class MyPlugin extends Plugin {
 		this.registerEvent(this.app.metadataCache.on('changed', (file, data, cache) => {
 			cached.setFileMap(file, cache, data)
 		}));
+		this.registerEvent(this.app.metadataCache.on('deleted', (file, data) => {
+			cached.deleteFileMap(file)
+		}));
 
 	}
 
@@ -75,6 +78,10 @@ class CachedStruct {
 	fileMap: Map<string, Selection[]>
 	constructor() {
 		this.fileMap = new Map<string, Selection[]>
+	}
+
+	deleteFileMap(file: TFile) {
+		this.fileMap.delete(file.path)
 	}
 
 	setFileMap(file: TFile, cache: CachedMetadata | null, data: string) {
@@ -198,7 +205,7 @@ class SelectorModal extends SuggestModal<Selection> {
 			}
 		}else {
 			const selection = el.createEl("div", { cls: "selection" });
-			selection.createEl("div", { text: value.title, cls: "selection__title" });
+			selection.createEl("div", { text: value.title, cls: "selection__title_bad" });
 		}
 	}
 
