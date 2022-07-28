@@ -31,17 +31,17 @@ class CachedStruct {
 		for (const section of cache.sections) {
 			
 			let tags: Array<TagCache> = []
-			if (cache.frontmatter != null) {
-				const tagsOpt = parseFrontMatterTags(cache.frontmatter)
-				if (tagsOpt != null) {
-					for (const tag of tagsOpt) {
-						tags.push({
-							tag: tag,
-							position: {start: {line: 0, col: 0, offset: 0}, end: {line: 0, col: 0, offset: 0}} 
-						})
-					}
-				}
-			}
+			// if (cache.frontmatter != null) {
+			// 	const tagsOpt = parseFrontMatterTags(cache.frontmatter)
+			// 	if (tagsOpt != null) {
+			// 		for (const tag of tagsOpt) {
+			// 			tags.push({
+			// 				tag: tag,
+			// 				position: {start: {line: 0, col: 0, offset: 0}, end: {line: 0, col: 0, offset: 0}} 
+			// 			})
+			// 		}
+			// 	}
+			// }
 			if (cache.tags != null) {
 				for (const tag of cache.tags) {
 					if (tag.position.start.offset >= section.position.start.offset && tag.position.end.offset <= section.position.end.offset) {
