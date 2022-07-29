@@ -283,13 +283,21 @@ class SelectorModal extends SuggestModal<Selection> {
 			{command: "↵", purpose: "to open"},
 			{command: "esc", purpose: "to dismiss"}
 		])
-		console.log(this.modalEl)
 		this.modalEl.style.setProperty("max-width", "80vw")
 		this.modalEl.style.setProperty("max-height", "80vh")
 		// this.modalEl.style.setProperty("display", "none")
 		// this.containerEl.style.setProperty("background-color","red")
 		this.setPlaceholder("Type one tag or multiple (eg.: tag1 tag2)")
 		this.limit = 20
+
+		const tags = res.map(k => k.tags).join().split(",").unique().slice(0,20)
+
+		const tagContainer = this.modalEl.createEl("p")
+		for (const tag of tags) {
+			tagContainer.createEl("a", { text: tag, cls: "tag selection__tag" });
+		}
+		
+		tagContainer.insertAfter(this.inputEl)
 	}
 
 	onClose() {
