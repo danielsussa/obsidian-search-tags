@@ -139,7 +139,7 @@ class CachedStruct {
 				kind:  SELECTION_KIND.CONTENT,
 				cursor: 0,
 				path: file.path,
-				description: data.replace(/[\r\n]/gm, '  ').substring(0,200),
+				description: data.replace(/[\r\n]/gm, '  ').substring(0,400),
 				tags: headerTags.sort().filter(function(elem, index, self) {
 					return index === self.indexOf(elem);
 				}),
@@ -163,7 +163,7 @@ class CachedStruct {
 					kind:  SELECTION_KIND.CONTENT,
 					cursor: i,
 					path: file.path,
-					description: data.replace(/[\r\n]/gm, '  ').substring(offset+tagIdx-100, offset+tagIdx+100),
+					description: data.replace(/[\r\n]/gm, '  ').substring(offset+tagIdx-200, offset+tagIdx+200),
 					tags: tags.sort().filter(function(elem, index, self) {
 						return index === self.indexOf(elem);
 					}),
@@ -283,6 +283,11 @@ class SelectorModal extends SuggestModal<Selection> {
 			{command: "↵", purpose: "to open"},
 			{command: "esc", purpose: "to dismiss"}
 		])
+		console.log(this.modalEl)
+		this.modalEl.style.setProperty("max-width", "80vw")
+		this.modalEl.style.setProperty("max-height", "80vh")
+		// this.modalEl.style.setProperty("display", "none")
+		// this.containerEl.style.setProperty("background-color","red")
 		this.setPlaceholder("Type one tag or multiple (eg.: tag1 tag2)")
 		this.limit = 20
 	}
