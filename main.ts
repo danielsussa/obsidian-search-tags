@@ -284,10 +284,11 @@ class SelectorModal extends SuggestModal<Selection> {
 			{command: "↵", purpose: "to open"},
 			{command: "esc", purpose: "to dismiss"}
 		])
-		this.modalEl.style.setProperty("max-width", "80vw")
+		this.modalEl.style.setProperty("max-width", "90vw")
+		this.modalEl.style.setProperty("width", "100%")
 		this.modalEl.style.setProperty("max-height", "80vh")
-		// this.modalEl.style.setProperty("display", "none")
-		// this.containerEl.style.setProperty("background-color","red")
+		this.modalEl.style.setProperty("height", "100%")
+
 		this.setPlaceholder("Type one tag or multiple (eg.: tag1 tag2)")
 		this.limit = 20
 
