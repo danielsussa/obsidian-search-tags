@@ -37,10 +37,6 @@ export default class MyPlugin extends Plugin {
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new SampleSettingTab(this.app, this));
 
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-
-		// when file change
 		this.registerEvent(this.app.metadataCache.on('changed', (file, data, cache) => {
 			cached.setFileMap(file, cache, data)
 		}));
@@ -139,7 +135,7 @@ class CachedStruct {
 				kind:  SELECTION_KIND.CONTENT,
 				cursor: 0,
 				path: file.path,
-				description: data.replace(/[\r\n]/gm, '  ').substring(0,400),
+				description: data.substring(0,400),
 				tags: headerTags.sort().filter(function(elem, index, self) {
 					return index === self.indexOf(elem);
 				}),
@@ -163,7 +159,7 @@ class CachedStruct {
 					kind:  SELECTION_KIND.CONTENT,
 					cursor: i,
 					path: file.path,
-					description: data.replace(/[\r\n]/gm, '  ').substring(offset+tagIdx-200, offset+tagIdx+200),
+					description: data.substring(offset+tagIdx-200, offset+tagIdx+200),
 					tags: tags.sort().filter(function(elem, index, self) {
 						return index === self.indexOf(elem);
 					}),
@@ -206,12 +202,16 @@ function compare( a: Selection, b: Selection ) {
 class SelectorModal extends SuggestModal<Selection> {
 
 	allResults: Selection[];
+	allTags: string[];
+	selectedTags: string[];
+	tagContainer: HTMLParagraphElement
 
 
-	getSuggestions(query: string): Selection[] | Promise<Selection[]> {
+	getSuggestions(query: string): Selection[] {
 		const getOrphan = query.startsWith("!")
 		const getNoMd = query.startsWith("!!")
 		let currentPath = ''
+
 		return this.allResults.filter((page) => {
 			if (!page.hasHeader && getNoMd){
 				return true
@@ -234,7 +234,6 @@ class SelectorModal extends SuggestModal<Selection> {
 				currentPath = page.path
 				return true
 			}
-
 		});
 	}
 
@@ -260,6 +259,7 @@ class SelectorModal extends SuggestModal<Selection> {
 			for (let i = 0; i < value.tags.length; i++) {
 				tagContainer.createEl("a", { text: value.tags[i], cls: "tag selection__tag" });
 			}
+
 		}
 
 	}
@@ -278,6 +278,7 @@ class SelectorModal extends SuggestModal<Selection> {
 	constructor(app: App, res: Selection[]) {
 		super(app);
 		this.allResults = res;
+		this.allTags = res.map(k => k.tags).join().split(",").unique();
 		this.setInstructions([
 			{command: "↑↓", purpose: "to navidate"},
 			{command: "↵", purpose: "to open"},
@@ -290,14 +291,11 @@ class SelectorModal extends SuggestModal<Selection> {
 		this.setPlaceholder("Type one tag or multiple (eg.: tag1 tag2)")
 		this.limit = 20
 
-		const tags = res.map(k => k.tags).join().split(",").unique().slice(0,20)
-
-		const tagContainer = this.modalEl.createEl("p")
-		for (const tag of tags) {
-			tagContainer.createEl("a", { text: tag, cls: "tag selection__tag" });
+		this.tagContainer = this.modalEl.createEl("p")
+		for (const tag of this.allTags.splice(0,30)) {
+			this.tagContainer.createEl("a", { text: tag, cls: "tag selection__tag" });
 		}
-		
-		tagContainer.insertAfter(this.inputEl)
+		this.tagContainer.insertAfter(this.inputEl)
 	}
 
 	onClose() {
