@@ -20,14 +20,16 @@ export default class MyPlugin extends Plugin {
 		await this.loadSettings();
 
 		const cached = await this.loadCachedStruct();
+		let modalSelector = new SelectorModal(this.app, cached)
 
 		// This adds a complex command that can check whether the current state of the app allows execution of the command
 		this.addCommand({
 			id: 'open-modal',
 			name: 'Open Tag Selector',
 			checkCallback: (checking: boolean) => {
+
 				if (!checking) {
-					new SelectorModal(this.app, cached.toSelections()).open();
+					modalSelector.open();
 				}
 				// This command will only show up in Command Palette when the check function returns true
 				return true;
@@ -75,20 +77,23 @@ const SELECTION_KIND = {
 	ORPHAN: 'orphan',
 	METATAG: 'metatag',
 	CONTENT: 'content',
-} as const
+}
 
 class CachedStruct {
-	fileMap: Map<string, Selection[]>
+	files: File[]
 	constructor() {
-		this.fileMap = new Map<string, Selection[]>
+		this.files = []
 	}
 
 	deleteFileMap(file: TFile) {
-		this.fileMap.delete(file.path)
+		this.files = this.files.filter(x => x.file != file)
 	}
 
 	setFileMap(file: TFile, cache: CachedMetadata | null, data: string) {
-		let selections: Array<Selection> = []
+		this.deleteFileMap(file)
+
+		let hasHeader = false
+		let selections: Array<FileTag> = []
 
 		let pathTag: string|null = null
 		const pathSpl = file.path.split("/") 
@@ -110,131 +115,166 @@ class CachedStruct {
 			}
 		}
 
-
-		// no tags and no header tags
-		if (cache?.tags == null && headerTags.length == 0) {
-			selections.push({
-				hasHeader: false,
-				date: date,
-				kind:  SELECTION_KIND.ORPHAN,
-				cursor: 0,
-				path: file.path,
-				description: "",
-				tags: [],
-				file: file
-			})
-			this.fileMap.set(file.path, selections)
-			return 
-		}
-
 		// push header tag
 		if (headerTags.length > 0) {
+			hasHeader = true
 			selections.push({
-				hasHeader: true,
-				date: date,
-				kind:  SELECTION_KIND.CONTENT,
 				cursor: 0,
-				path: file.path,
 				description: data.substring(0,400),
 				tags: headerTags.sort().filter(function(elem, index, self) {
 					return index === self.indexOf(elem);
 				}),
-				file: file
+			})
+		}
+
+
+		// no tags and no header tags
+		if (cache?.tags == null && headerTags.length == 0) {
+			selections.push({
+				cursor: 0,
+				description: "",
+				tags: [],
 			})
 		}
 		
 
-		const dataSpl = data.split("\n")
-		let offset = 0;
-		for (let i = 0 ; i < dataSpl.length ; i++){
-			const paragraph = dataSpl[i]
-			const tagIdx = paragraph.search(tagRegex)
-	
-			if (tagIdx != -1) {
-				const tags = [...paragraph.matchAll(tagRegex)].map(k => k[0]).join().replace("/",",").split(",");
-				tags.push(...headerTags)
-				selections.push({
-					hasHeader: headerTags.length > 0,
-					date: date,
-					kind:  SELECTION_KIND.CONTENT,
-					cursor: i,
-					path: file.path,
-					description: data.substring(offset+tagIdx-200, offset+tagIdx+200),
-					tags: tags.sort().filter(function(elem, index, self) {
-						return index === self.indexOf(elem);
-					}),
-					file: file
-				})
+		if (cache?.tags != null) {
+			const dataSpl = data.split("\n")
+			let offset = 0;
+			for (let i = 0 ; i < dataSpl.length ; i++){
+				const paragraph = dataSpl[i]
+				const tagIdx = paragraph.search(tagRegex)
+		
+				if (tagIdx != -1) {
+					const tags = [...paragraph.matchAll(tagRegex)].map(k => k[0]).join().replace("/",",").split(",");
+					tags.push(...headerTags)
+					selections.push({
+						cursor: i,
+						description: data.substring(offset+tagIdx-200, offset+tagIdx+200),
+						tags: tags.sort().filter(function(elem, index, self) {
+							return index === self.indexOf(elem);
+						}),
+					})
+				}
+				offset += paragraph.length
 			}
-			offset += paragraph.length
 		}
-		this.fileMap.set(file.path, selections)
+
+		this.files.push({
+			fileTags: selections,
+			file: file,
+			date: date,
+			hasHeader: hasHeader
+		})
+		this.files.sort((a,b) => {
+			if (a.date == undefined) {
+				return 1
+			}
+			if (b.date == undefined) {
+				return -1
+			}
+			return a.date > b.date ? -1 : 1;
+		})
 	}
 
-	toSelections() : Selection[] {
+
+	search(query: string): Selection[] {
+		const getOrphan = query.startsWith("!")
+		const getNoMd = query.startsWith("!!")
 		let selections: Array<Selection> = []
-		this.fileMap.forEach(k => selections.push(...k))
-		return selections.sort(compare)
+
+		for (const file of this.files) {
+			if (getNoMd && !file.hasHeader) {
+				selections.push({
+					path: file.file.path,
+					file: file.file,
+					hasHeader: false,
+					kind: SELECTION_KIND.METATAG,
+					cursor: 0,
+					description: "",
+					tags: []
+				})
+			}
+			if (getOrphan && file.fileTags.length == 0) {
+				selections.push({
+					path: file.file.path,
+					file: file.file,
+					hasHeader: false,
+					kind: SELECTION_KIND.ORPHAN,
+					cursor: 0,
+					description: "",
+					tags: []
+				})
+			}
+
+			let isFirst = true
+			for (const fileTag of file.fileTags) {
+				for (const subQuery of query.split(" ")) {
+					
+					const tagsJoin = fileTag.tags.join()
+					if (!tagsJoin.contains(subQuery)) {
+						continue
+					}
+
+					let kind = SELECTION_KIND.CONTENT
+					if (isFirst) {
+						kind = SELECTION_KIND.METATAG
+					}
+
+					isFirst = false
+					selections.push({
+						hasHeader: file.hasHeader,
+						file: file.file,
+						path: file.file.path,
+						kind: kind,
+						cursor: fileTag.cursor,
+						description: fileTag.description,
+						tags: fileTag.tags
+					})
+				}
+			}
+		}
+		return selections
+	}
+
+	getAll(): File[] {
+		return this.files
 	}
 }
 
-interface Selection {
+interface File {
 	hasHeader: boolean;
-	date: string|undefined;
-	kind: string;
-	cursor: number;
 	file: TFile;
-	path: string;
+	date: string|undefined;
+	fileTags: FileTag[]
+}
+
+interface FileTag {
+	cursor: number;
 	description: string;
 	tags: string[];
 }
 
-function compare( a: Selection, b: Selection ) {
-	if (a.date == undefined) {
-		return 1
-	}
-	if (b.date == undefined) {
-		return -1
-	}
-	return a.date > b.date ? -1 : 1;
-  }
+interface Selection {
+	hasHeader: boolean
+	file: TFile;
+	kind: string;
+	path: string;
+	cursor: number;
+	description: string;
+	tags: string[];
+}
 
 class SelectorModal extends SuggestModal<Selection> {
 
+	cached: CachedStruct;
 	allResults: Selection[];
 	allTags: string[];
 	selectedTags: string[];
 	tagContainer: HTMLParagraphElement
 
-
 	getSuggestions(query: string): Selection[] {
-		const getOrphan = query.startsWith("!")
-		const getNoMd = query.startsWith("!!")
-		let currentPath = ''
-
-		return this.allResults.filter((page) => {
-			if (!page.hasHeader && getNoMd){
-				return true
-			} else if (getOrphan) {
-				return page.kind == SELECTION_KIND.ORPHAN;
-			} else {
-				if (page.kind == SELECTION_KIND.ORPHAN) {
-					return false
-				}
-				for (const subQuery of query.split(" ")) {
-					
-					const tagsJoin = page.tags.join()
-					if (!tagsJoin.contains(subQuery)) {
-						return false
-					}
-				}
-				if (page.path != currentPath) {
-					page.kind = SELECTION_KIND.METATAG
-				}
-				currentPath = page.path
-				return true
-			}
-		});
+		return this.cached.search(query)
 	}
 
 	renderSuggestion(value: Selection, el: HTMLElement) {
@@ -275,10 +315,10 @@ class SelectorModal extends SuggestModal<Selection> {
 		
 	}
 
-	constructor(app: App, res: Selection[]) {
+	constructor(app: App, cache: CachedStruct) {
 		super(app);
-		this.allResults = res;
-		this.allTags = res.map(k => k.tags).join().split(",").unique();
+				
+		this.cached = cache
 		this.setInstructions([
 			{command: "↑↓", purpose: "to navidate"},
 			{command: "↵", purpose: "to open"},
@@ -292,16 +332,33 @@ class SelectorModal extends SuggestModal<Selection> {
 		this.setPlaceholder("Type one tag or multiple (eg.: tag1 tag2)")
 		this.limit = 20
 
-		this.tagContainer = this.modalEl.createEl("p")
-		for (const tag of this.allTags.splice(0,30)) {
-			this.tagContainer.createEl("a", { text: tag, cls: "tag selection__tag" });
-		}
-		this.tagContainer.insertAfter(this.inputEl)
+
+		// const res = cached.toSelections()
+		// this.allResults = res;
+		// this.allTags = res.map(k => k.tags).join().split(",").unique();
+		// this.selectedTags = res.map(k => k.tags).join().split(",").unique();
+
+
+		// this.tagContainer = this.modalEl.createEl("p")
+		// for (const tag of this.allTags.splice(0,30)) {
+		// 	this.tagContainer.createEl("a", { text: tag, cls: "tag selection__tag" });
+		// }
+		// this.tagContainer.insertAfter(this.inputEl)
+
+
 	}
+
+	// onOpen(): void {
+	// 	this.inputEl.setAttribute("value", "fsfs")
+	// }
 
 	onClose() {
 		const {contentEl} = this;
 		contentEl.empty();
+	}
+
+	open(): void {
+		super.open()
 	}
 }
 

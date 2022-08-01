@@ -4,7 +4,7 @@
 }
 
 .selection-content {
-    border-left: 3px solid var(--background-modifier-border);
+    border-left: 5px solid var(--background-modifier-border);
     padding: 10px;
 }
   
