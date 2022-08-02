@@ -287,25 +287,30 @@ class SelectorModal extends SuggestModal<Selection> {
 	renderSuggestion(value: Selection, el: HTMLElement) {
 		if (value.kind == SELECTION_KIND.CONTENT) {
 			const selection = el.createEl("div", { cls: "selection-content" });
-			selection.createEl("small", { text: value.description, cls: "selection__description" });
-	
+
 			const tagContainer = selection.createEl("p")
 			for (let i = 0; i < value.tags.length; i++) {
 				tagContainer.createEl("a", { text: value.tags[i], cls: "tag selection__tag" });
 			}
+
+			selection.createEl("small", { text: value.description, cls: "selection__description" });
+
 		}else if (value.kind == SELECTION_KIND.ORPHAN) {
 			const selection = el.createEl("div", { cls: "selection" });
 			selection.createEl("div", { text: value.path, cls: "selection__title_bad" });
 		}else if (value.kind == SELECTION_KIND.METATAG) {
 			const selection = el.createEl("div", { cls: "selection" });
 			const title = selection.createEl("div", { text: value.path, cls: "selection__title" });
-			title.createEl("small", { text: !value.hasHeader ? ' → (miss metadata)': '', cls: "selection__title_bad" });
-			selection.createEl("small", { text: value.description, cls: "selection__description" });
-	
-			const tagContainer = selection.createEl("p")
+
+			const tagContainer = title.createEl("span", {text:" "})
 			for (let i = 0; i < value.tags.length; i++) {
 				tagContainer.createEl("a", { text: value.tags[i], cls: "tag selection__tag" });
 			}
+			
+			title.createEl("small", { text: !value.hasHeader ? ' → (miss metadata)': '', cls: "selection__title_bad" });
+			selection.createEl("small", { text: value.description, cls: "selection__description" });
+	
+
 
 		}
 
@@ -355,7 +360,7 @@ class SelectorModal extends SuggestModal<Selection> {
 
 	updateTagContainer(query: string) {
 		this.tagContainer.empty()
-		for (const tag of this.cached.searchTags(query)) {
+		for (const tag of this.cached.searchTags(query).splice(0,20)) {
 			this.tagContainer.createEl("a", { text: tag, cls: "tag selection__tag" });
 		}
 	}

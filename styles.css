@@ -10,6 +10,8 @@
   
 .selection__title {
     font-weight: 600;
+    /* display: flex;
+    justify-content: space-between; */
 }
 
 .selection__title_bad {
