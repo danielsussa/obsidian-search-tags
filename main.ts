@@ -181,8 +181,19 @@ class CachedStruct {
 		const result = this.files.map(file => 
 			file.fileTags.map(ftag => 
 				ftag.tags.join()
-			)
-		).join().split(",").unique().filter(tag =>  tag.contains(query))
+			).filter(tag =>  {
+				const queries = query.split(" ")
+				for (let idx = 0; idx < queries.length; idx++) {
+					if (tag.contains(queries[idx]) && idx == 0){
+						return true
+					}
+					if (tag.contains(queries[idx]) && idx > 0 && queries[idx].length > 1){
+						return true
+					}
+				}
+				return false
+			})
+		).join().split(",").unique()
 		return result
 	}
 
