@@ -177,6 +177,15 @@ class CachedStruct {
 		})
 	}
 
+	searchTags(query: string): string[] {
+		const result = this.files.map(file => 
+			file.fileTags.map(ftag => 
+				ftag.tags.join()
+			)
+		).join().split(",").unique().filter(tag =>  tag.contains(query))
+		return result
+	}
+
 
 	search(query: string): Selection[] {
 		const getOrphan = query.startsWith("!")
@@ -268,12 +277,10 @@ interface Selection {
 class SelectorModal extends SuggestModal<Selection> {
 
 	cached: CachedStruct;
-	allResults: Selection[];
-	allTags: string[];
-	selectedTags: string[];
 	tagContainer: HTMLParagraphElement
 
 	getSuggestions(query: string): Selection[] {
+		this.updateTagContainer(query)
 		return this.cached.search(query)
 	}
 
@@ -338,19 +345,32 @@ class SelectorModal extends SuggestModal<Selection> {
 		// this.allTags = res.map(k => k.tags).join().split(",").unique();
 		// this.selectedTags = res.map(k => k.tags).join().split(",").unique();
 
+		
 
-		// this.tagContainer = this.modalEl.createEl("p")
-		// for (const tag of this.allTags.splice(0,30)) {
-		// 	this.tagContainer.createEl("a", { text: tag, cls: "tag selection__tag" });
-		// }
-		// this.tagContainer.insertAfter(this.inputEl)
-
+		this.tagContainer = this.modalEl.createEl("p")
+		this.tagContainer.insertAfter(this.inputEl)
+		
 
 	}
 
-	// onOpen(): void {
-	// 	this.inputEl.setAttribute("value", "fsfs")
-	// }
+	updateTagContainer(query: string) {
+		this.tagContainer.empty()
+		for (const tag of this.cached.searchTags(query)) {
+			this.tagContainer.createEl("a", { text: tag, cls: "tag selection__tag" });
+		}
+	}
+
+	onOpen(): void {
+		// this.inputEl.setAttribute("value", "fsfs")
+		this.updateTagContainer("")
+
+		for (const sugestion of this.getSuggestions("")) {
+			this.renderSuggestion(sugestion, this.resultContainerEl)
+		}
+		super.onOpen()
+	
+	}
+
 
 	onClose() {
 		const {contentEl} = this;
