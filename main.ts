@@ -177,31 +177,12 @@ class CachedStruct {
 		})
 	}
 
-	searchTags(query: string): string[] {
-		const result = this.files.map(file => 
-			file.fileTags.map(ftag => 
-				ftag.tags.join()
-			).filter(tag =>  {
-				const queries = query.split(" ")
-				for (let idx = 0; idx < queries.length; idx++) {
-					if (tag.contains(queries[idx]) && idx == 0){
-						return true
-					}
-					if (tag.contains(queries[idx]) && idx > 0 && queries[idx].length > 1){
-						return true
-					}
-				}
-				return false
-			})
-		).join().split(",").unique()
-		return result
-	}
 
-
-	search(query: string): Selection[] {
+	search(query: string): SelectionContainer {
 		const getOrphan = query.startsWith("!")
 		const getNoMd = query.startsWith("!!")
 		let selections: Array<Selection> = []
+		let allTags: Array<string> = []
 
 		for (const file of this.files) {
 			if (getNoMd && !file.hasHeader) {
@@ -229,13 +210,18 @@ class CachedStruct {
 
 			let isFirst = true
 			for (const fileTag of file.fileTags) {
+				let toSelection = true
 				for (const subQuery of query.split(" ")) {
 					
 					const tagsJoin = fileTag.tags.join()
 					if (!tagsJoin.contains(subQuery)) {
-						continue
+						toSelection = false
+						break
 					}
 
+				}
+
+				if (toSelection) {
 					let kind = SELECTION_KIND.CONTENT
 					if (isFirst) {
 						kind = SELECTION_KIND.METATAG
@@ -251,10 +237,15 @@ class CachedStruct {
 						description: fileTag.description,
 						tags: fileTag.tags
 					})
+					allTags.push(...fileTag.tags)
 				}
+
 			}
 		}
-		return selections
+		return {
+			selections: selections,
+			tags: allTags.unique()
+		}
 	}
 
 	getAll(): File[] {
@@ -275,6 +266,11 @@ interface FileTag {
 	tags: string[];
 }
 
+interface SelectionContainer {
+	selections: Selection[]
+	tags: string[]
+}
+
 interface Selection {
 	hasHeader: boolean
 	file: TFile;
@@ -291,8 +287,9 @@ class SelectorModal extends SuggestModal<Selection> {
 	tagContainer: HTMLParagraphElement
 
 	getSuggestions(query: string): Selection[] {
-		this.updateTagContainer(query)
-		return this.cached.search(query)
+		const container = this.cached.search(query)
+		this.renderTags(container.tags)
+		return container.selections
 	}
 
 	renderSuggestion(value: Selection, el: HTMLElement) {
@@ -369,18 +366,18 @@ class SelectorModal extends SuggestModal<Selection> {
 
 	}
 
-	updateTagContainer(query: string) {
+	renderTags(tags: string[]) {
 		this.tagContainer.empty()
-		for (const tag of this.cached.searchTags(query).splice(0,20)) {
+		for (const tag of tags.splice(0,20)) {
 			this.tagContainer.createEl("a", { text: tag, cls: "tag selection__tag" });
 		}
 	}
 
 	onOpen(): void {
-		// this.inputEl.setAttribute("value", "fsfs")
-		this.updateTagContainer("")
+		const container = this.cached.search("")
+		this.renderTags(container.tags)
 
-		for (const sugestion of this.getSuggestions("")) {
+		for (const sugestion of container.selections) {
 			this.renderSuggestion(sugestion, this.resultContainerEl)
 		}
 		super.onOpen()
