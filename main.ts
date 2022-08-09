@@ -113,6 +113,9 @@ class CachedStruct {
 			if (pathTag != null) {
 				headerTags.push(pathTag)
 			}
+			if (date != null) {
+				headerTags.push(date)
+			}
 		}
 
 		// push header tag
