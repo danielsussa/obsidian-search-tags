@@ -330,6 +330,8 @@ class SelectorModal extends SuggestModal<Selection> {
 			if (leaf.view?.getViewType() === 'markdown') {
 				const md = leaf.view as MarkdownView;
 				md.editor.setCursor(item.cursor)
+				const ep = md.editor.getCursor()
+				md.editor.scrollIntoView({from: ep, to: ep}, true)
 			}
 		})
 		
