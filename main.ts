@@ -106,8 +106,11 @@ class CachedStruct {
 		const date = data.match(dateRegex)?.first()?.substring(6)
 		
 
+		let contentData = data
 		// if has header tag
 		if (cache?.frontmatter != null) {
+			contentData = contentData.substring(cache.frontmatter.position.end.offset)
+			contentData = contentData.trimStart()
 	
 			parseFrontMatterTags(cache.frontmatter)?.forEach(t => headerTags.push(t))
 			if (pathTag != null) {
@@ -123,7 +126,7 @@ class CachedStruct {
 			hasHeader = true
 			selections.push({
 				cursor: 0,
-				description: data.substring(0,400),
+				description: contentData.substring(0,400),
 				tags: headerTags.sort().filter(function(elem, index, self) {
 					return index === self.indexOf(elem);
 				}),
@@ -153,7 +156,7 @@ class CachedStruct {
 					tags.push(...headerTags)
 					selections.push({
 						cursor: i,
-						description: data.substring(offset+tagIdx-200, offset+tagIdx+200),
+						description: contentData.substring(offset+tagIdx-200, offset+tagIdx+200),
 						tags: tags.sort().filter(function(elem, index, self) {
 							return index === self.indexOf(elem);
 						}),
@@ -299,7 +302,9 @@ class SelectorModal extends SuggestModal<Selection> {
 		if (value.kind == SELECTION_KIND.CONTENT) {
 			const selection = el.createEl("div", { cls: "selection-content" });
 
-			const tagContainer = selection.createEl("p")
+			const title = selection.createEl("div", { cls: "selection__title" });
+
+			const tagContainer = title.createEl("span", {text:" "})
 			for (let i = 0; i < value.tags.length; i++) {
 				tagContainer.createEl("a", { text: value.tags[i], cls: "tag selection__tag" });
 			}
